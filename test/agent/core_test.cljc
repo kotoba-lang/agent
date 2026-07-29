@@ -1,0 +1,70 @@
+(ns agent.core-test
+  (:require [clojure.test :refer [deftest is testing]]
+            [agent.run :as run]))
+
+(def t0 1785000000000)
+
+;; ───────────────────────────── run ─────────────────────────────
+
+(deftest a-run-needs-a-stated-goal
+  (testing "a run with no goal cannot be reviewed or explained afterwards"
+    (is (thrown? #?(:clj Exception :cljs js/Error)
+                 (run/agent-run {:goal "   "} t0)))
+    (is (thrown? #?(:clj Exception :cljs js/Error)
+                 (run/agent-run {} t0)))))
+
+(deftest a-new-run-is-queued-and-bounded
+  (let [r (run/agent-run {:goal "make the tests pass"} t0)]
+    (is (= :queued (:agent.run/status r)))
+    (is (zero? (:agent.run/attempt r)))
+    (testing "budget defaults are merged, not replaced"
+      (is (= 12 (get-in r [:agent.run/budget :max-turns])))
+      (is (= 1200000 (get-in r [:agent.run/budget :deadline-ms]))))
+    (testing "a caller override keeps the other ceilings"
+      (let [r2 (run/agent-run {:goal "g" :budget {:max-turns 3}} t0)]
+        (is (= 3 (get-in r2 [:agent.run/budget :max-turns])))
+        (is (= 30 (get-in r2 [:agent.run/budget :max-tool-calls])))))))
+
+(deftest leasing-counts-an-attempt
+  (let [r (-> (run/agent-run {:goal "g"} t0)
+              (run/transition :leased t0 {}))]
+    (is (= 1 (:agent.run/attempt r)))
+    (is (= 2 (:agent.run/attempt (run/transition
+                                  (run/transition r :queued t0 {})
+                                  :leased t0 {}))))))
+
+(deftest illegal-transitions-throw-rather-than-corrupt
+  (testing "a run whose history stops explaining its state is worse than a crash"
+    (let [r (run/agent-run {:goal "g"} t0)]
+      (is (thrown? #?(:clj Exception :cljs js/Error)
+                   (run/transition r :running t0 {})))
+      (is (thrown? #?(:clj Exception :cljs js/Error)
+                   (run/transition r :succeeded t0 {}))))))
+
+(deftest refusal-is-a-dead-end
+  (testing ":rejected and :cancelled have no way out — re-deriving a run
+            from a human's no would launder the refusal"
+    (is (empty? (get run/transitions :rejected)))
+    (is (empty? (get run/transitions :cancelled))))
+  (testing ":failed can be requeued, because a failure is often retryable"
+    (is (= #{:queued} (get run/transitions :failed)))))
+
+(deftest folding-ignores-non-run-events
+  (testing "loop/actor/audit events share the stream but must not become runs"
+    (let [r (run/agent-run {:goal "g" :id "run-1"} t0)
+          events [(assoc (run/event r :run/submitted t0 {:run r}) :agent.event/run "run-1")
+                  {:agent.event/run nil :agent.event/kind :loop/tick :agent.event/at t0}]
+          folded (run/fold-events events)]
+      (is (= 1 (count folded)))
+      (is (contains? folded "run-1"))
+      (is (not (contains? folded nil))))))
+
+(deftest resumable-and-active-classification
+  (let [mk (fn [s] (assoc (run/agent-run {:goal "g"} t0) :agent.run/status s))]
+    (is (run/resumable? (mk :failed)))
+    (is (run/resumable? (mk :checkpointed)))
+    (is (run/resumable? (mk :held)))
+    (is (not (run/resumable? (mk :succeeded))))
+    (is (run/active? (mk :running)))
+    (is (not (run/active? (mk :cancelled))))
+    (is (run/terminal? (mk :rejected)))))
