@@ -64,4 +64,7 @@ clojure -M:test   # JVM host — must agree exactly
 
 Split out of `kotoba-lang/ao` on 2026-07-29, where it had been placed by
 mistake: `ao` briefly held all three layers before the axes were separated.
-Originally from `kotoba.tamaki.model`. **tamaki has not been switched over.**
+Originally from `kotoba.tamaki.model`. Tamaki now adopts this repository
+through a compatibility adapter and supplies its persisted
+`:tamaki.event/*` attribute map to `agent.run/event-keys`; existing event
+stores therefore require no migration.
