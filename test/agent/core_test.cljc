@@ -68,3 +68,26 @@
     (is (run/active? (mk :running)))
     (is (not (run/active? (mk :cancelled))))
     (is (run/terminal? (mk :rejected)))))
+
+(deftest a-hosts-persisted-event-prefix-is-not-forced-to-change
+  (testing "tamaki has 231 :tamaki.event/* occurrences reaching its store;
+            a library adoptable only by rewriting the adopter's database is
+            not shared"
+    (let [ks (run/event-keys "tamaki.event")
+          r (run/agent-run {:goal "g" :id "run-1"} t0)
+          ev (run/event ks r :run/leased t0 {})]
+      (is (= :tamaki.event/kind (:kind ks)))
+      (is (contains? ev :tamaki.event/run))
+      (is (not (contains? ev :agent.event/run)))
+      (testing "and it folds through the same machine"
+        (let [folded (run/fold-events ks [(run/event ks r :run/submitted t0 {:run r})
+                                          ev])]
+          (is (= :leased (:agent.run/status (get folded "run-1")))))))))
+
+(deftest the-default-prefix-still-works-untouched
+  (let [r (run/agent-run {:goal "g" :id "run-2"} t0)
+        ev (run/event r :run/leased t0 {})]
+    (is (contains? ev :agent.event/run))
+    (is (= :leased (:agent.run/status
+                    (get (run/fold-events [(run/event r :run/submitted t0 {:run r}) ev])
+                         "run-2"))))))

@@ -117,18 +117,38 @@
                     :agent.run/updated-at now-ms})
       (= status :leased) (update :agent.run/attempt inc))))
 
-(defn event
-  [run kind now-ms data]
-  {:agent.event/version contract-version
-   :agent.event/id (str (random-uuid))
-   :agent.event/run (:agent.run/id run)
-   :agent.event/parent (:agent.run/parent run)
-   :agent.event/kind kind
-   :agent.event/at now-ms
-   :agent.event/data data})
+(defn event-keys
+  "The six attribute names an event record uses, derived from a namespace.
 
-(defn apply-event
-  [run {:agent.event/keys [kind at data]}]
+  Parameterized because an existing host's event stream is PERSISTED DATA.
+  tamaki has 231 `:tamaki.event/*` occurrences reaching `store` and
+  `storage`; forcing this library's prefix on it would be a migration, not a
+  refactor. A shared library that can only be adopted by rewriting the
+  adopter's database is not shared."
+  [ns-str]
+  {:version (keyword ns-str "version")
+   :id (keyword ns-str "id")
+   :run (keyword ns-str "run")
+   :parent (keyword ns-str "parent")
+   :kind (keyword ns-str "kind")
+   :at (keyword ns-str "at")
+   :data (keyword ns-str "data")})
+
+(def default-event-keys (event-keys "agent.event"))
+
+(defn event
+  ([run kind now-ms data] (event default-event-keys run kind now-ms data))
+  ([ks run kind now-ms data]
+   {(:version ks) contract-version
+    (:id ks) (str (random-uuid))
+    (:run ks) (:agent.run/id run)
+    (:parent ks) (:agent.run/parent run)
+    (:kind ks) kind
+    (:at ks) now-ms
+    (:data ks) data}))
+
+(defn- apply-event*
+  [run kind at data]
   (case kind
     :run/submitted (or run (:run data))
     :run/configured (merge run data)
@@ -164,20 +184,29 @@
                      (transition run :cancelled at data))
     run))
 
+(defn apply-event
+  ([run ev] (apply-event default-event-keys run ev))
+  ([ks run ev]
+   (let [kind (get ev (:kind ks))
+         at (get ev (:at ks))
+         data (get ev (:data ks))]
+     (apply-event* run kind at data))))
+
 (defn fold-events
-  "Rebuild every run from the append-only stream. Loop, actor and audit
-  events share that stream but are not AgentRuns — they must never
-  materialize as nil entries, which is why the nil check is here rather
-  than left to the caller."
-  [events]
-  (reduce
-   (fn [runs ev]
-     (let [id (:agent.event/run ev)
-           current (get runs id)
-           next-run (apply-event current ev)]
-       (if next-run (assoc runs id next-run) runs)))
-   {}
-   events))
+  "Rebuild every run from the append-only stream. Loop, role and audit events
+  share that stream but are not AgentRuns — they must never materialize as
+  nil entries, which is why the nil check is here rather than left to the
+  caller."
+  ([events] (fold-events default-event-keys events))
+  ([ks events]
+   (reduce
+    (fn [runs ev]
+      (let [id (get ev (:run ks))
+            current (get runs id)
+            next-run (apply-event ks current ev)]
+        (if next-run (assoc runs id next-run) runs)))
+    {}
+    events)))
 
 (defn resumable? [run]
   (contains? #{:failed :checkpointed :held} (:agent.run/status run)))
