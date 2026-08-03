@@ -60,6 +60,15 @@ clojure -M:test   # JVM host — must agree exactly
 
 7 tests, 25 assertions, both hosts.
 
+## Kotoba source authority
+
+`src/agent/bounded_run.kotoba` owns the deterministic AgentRun lifecycle:
+creation, legal transitions, attempts, and active/terminal/resumable queries.
+It is zero-capability and targets restricted browser JS and typed browser Wasm.
+Identity, clock, persistence, scheduling, and execution stay outside this pure
+kernel and enter through `kotoba-lang` providers. The retained CLJC/event-fold
+boundary is recorded in `migration/bounded-run-v1.edn`.
+
 ## Status
 
 Split out of `kotoba-lang/ao` on 2026-07-29, where it had been placed by
