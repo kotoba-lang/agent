@@ -59,6 +59,22 @@
       (is (contains? folded "run-1"))
       (is (not (contains? folded nil))))))
 
+(deftest contradictory-terminal-history-is-isolated-not-global
+  (let [r (run/agent-run {:goal "g" :id "run-conflict"} t0)
+        leased (run/transition r :leased (inc t0) {})
+        running (run/transition leased :running (+ t0 2) {})
+        events [(run/event r :run/submitted t0 {:run r})
+                (run/event r :run/leased (inc t0) {})
+                (run/event leased :run/started (+ t0 2) {})
+                (run/event running :run/succeeded (+ t0 3) {})
+                (run/event running :run/failed (+ t0 4) {:agent.run/exit 1})]
+        folded (get (run/fold-events events) "run-conflict")]
+    (is (= :succeeded (:agent.run/status folded)))
+    (is (true? (:agent.run/replay-conflict? folded)))
+    (is (= [{:event :run/failed :at (+ t0 4)
+             :preserved :succeeded :ignored :failed}]
+           (:agent.run/replay-conflicts folded)))))
+
 (deftest resumable-and-active-classification
   (let [mk (fn [s] (assoc (run/agent-run {:goal "g"} t0) :agent.run/status s))]
     (is (run/resumable? (mk :failed)))

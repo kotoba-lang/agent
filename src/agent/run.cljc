@@ -147,6 +147,19 @@
     (:at ks) now-ms
     (:data ks) data}))
 
+(defn- preserve-terminal-conflict
+  "Keep the first durable terminal result while making a contradictory later
+  event visible. Append-only stores cannot delete a bad historical event, and
+  one such event must not prevent every unrelated run from being replayed."
+  [run requested kind at]
+  (-> run
+      (assoc :agent.run/replay-conflict? true)
+      (update :agent.run/replay-conflicts (fnil conj [])
+              {:event kind
+               :at at
+               :preserved (:agent.run/status run)
+               :ignored requested})))
+
 (defn- apply-event*
   [run kind at data]
   (case kind
@@ -161,6 +174,8 @@
     ;; never bypass `transition` for any state that has a legal path.
     :run/succeeded (cond
                      (= :succeeded (:agent.run/status run)) run
+                     (terminal-statuses (:agent.run/status run))
+                     (preserve-terminal-conflict run :succeeded kind at)
                      (= :queued (:agent.run/status run))
                      (merge run data
                             {:agent.run/status :succeeded
@@ -169,6 +184,8 @@
                      :else (transition run :succeeded at data))
     :run/failed (cond
                   (= :failed (:agent.run/status run)) run
+                  (terminal-statuses (:agent.run/status run))
+                  (preserve-terminal-conflict run :failed kind at)
                   (= :queued (:agent.run/status run))
                   (merge run data
                          {:agent.run/status :failed
@@ -176,12 +193,16 @@
                           :agent.run/recovered-lifecycle true})
                   :else (transition run :failed at data))
     :run/requeued (transition run :queued at data)
-    :run/rejected (if (= :rejected (:agent.run/status run))
-                    run
-                    (transition run :rejected at data))
-    :run/cancelled (if (= :cancelled (:agent.run/status run))
-                     run
-                     (transition run :cancelled at data))
+    :run/rejected (cond
+                    (= :rejected (:agent.run/status run)) run
+                    (terminal-statuses (:agent.run/status run))
+                    (preserve-terminal-conflict run :rejected kind at)
+                    :else (transition run :rejected at data))
+    :run/cancelled (cond
+                     (= :cancelled (:agent.run/status run)) run
+                     (terminal-statuses (:agent.run/status run))
+                     (preserve-terminal-conflict run :cancelled kind at)
+                     :else (transition run :cancelled at data))
     run))
 
 (defn apply-event
