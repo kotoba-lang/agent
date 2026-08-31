@@ -4,8 +4,48 @@ One **bounded execution**. An agent is invoked with a request, does it, and
 ends.
 
 ```
-src/agent/run.cljc   AgentRun contract, state machine, event fold
+src/agent/run.cljc            AgentRun contract, state machine, event fold
+src/agent/bounded_run.kotoba  the same lifecycle, as a sovereign kernel
+src/agent/turn_loop.kotoba    the TURN loop inside a run: admission, budget,
+                              exit reasons -- transcribed from the hermes agent
 ```
+
+## The turn loop
+
+`bounded_run` owns the run's lifecycle (queued → leased → running → …).
+`turn_loop` owns what happens *inside* `running`: how many provider calls a
+turn may make, what spends the iteration budget, and which of five reasons
+ends it.
+
+It is a transcription of the loop that actually drives this workspace's bot
+fleet — `NousResearch/hermes-agent`, `agent/conversation_loop.py:2074..2115`
+and the whole of `agent/iteration_budget.py` — as
+`state + event -> next-state + one inert effect`. Provider calls, tool
+execution and message building stay outside: those are sockets, SDKs and
+credentials, which is mechanism, not product semantics.
+
+```
+nbb scripts/verify-turn-loop-parity.cljs      # 0 parity holds, 1 disagrees, 2 could not measure
+```
+
+The gate compiles the module to **both** `js-browser` and `wasm32-browser`,
+replays ten vectors through the js artifact, and asserts `main() = 42` on both.
+The vectors come from `migration/hermes_turn_loop_oracle.py`, which *imports*
+the upstream `IterationBudget` instead of reimplementing it, so half the
+contract is the upstream's own code and the other half is what the gate checks.
+When the upstream checkout is present the gate regenerates the vectors and
+fails on drift.
+
+Two facts the transcription surfaced that the Python prose did not:
+
+- **`budget_exhausted` is unreachable single-threaded.** The `while` condition
+  tests `remaining > 0` before the body, so `consume()` can only fail if
+  another thread took the last iteration. The branch is kept because upstream
+  is thread-safe; no vector reaches it, and that is a fact about the schedule
+  rather than a missing case.
+- **A grace call raises the call count past `max_iterations` without spending
+  budget.** Measured: `max=1 budget=9`, tick/grace/tick/tick ends at
+  `api_call_count=2`, `budget_used=1`, `max_iterations_reached`.
 
 ## Where it sits
 
