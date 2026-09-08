@@ -42,7 +42,7 @@
             ["node:path" :as path]
             ["node:child_process" :as cp]
             [clojure.edn :as edn]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (def root (.cwd js/process))
 (def src (path/join root "src" "agent" "turn_loop.kotoba"))
