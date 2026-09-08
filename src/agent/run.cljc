@@ -15,7 +15,7 @@
   Extracted from `kotoba.tamaki.model` via `ao.run` (kotoba-lang/tamaki
   ADR-0001). Pure and portable: no clock, no storage, no runner — every
   function takes `now-ms` from its caller."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (def contract-version 1)
 
