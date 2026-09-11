@@ -1,7 +1,7 @@
 {:schema :kotoba.agent-migration/v1
  :profile :kotoba.agent/bounded-run-v1
  :legacy
- {:source "src/agent/run.cljc"
+ {:source "src/agent/run.cljk"
   :status :retained-event-and-host-oracle}
  :canonical
  {:source "src/agent/bounded_run.kotoba"
