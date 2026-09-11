@@ -4,7 +4,7 @@ One **bounded execution**. An agent is invoked with a request, does it, and
 ends.
 
 ```
-src/agent/run.cljc            AgentRun contract, state machine, event fold
+src/agent/run.cljk            AgentRun contract, state machine, event fold
 src/agent/bounded_run.kotoba  the same lifecycle, as a sovereign kernel
 src/agent/turn_loop.kotoba    the TURN loop inside a run: admission, budget,
                               exit reasons -- transcribed from the hermes agent
@@ -25,7 +25,7 @@ execution and message building stay outside: those are sockets, SDKs and
 credentials, which is mechanism, not product semantics.
 
 ```
-nbb scripts/verify-turn-loop-parity.cljs      # 0 parity holds, 1 disagrees, 2 could not measure
+nbb scripts/verify-turn-loop-parity.cljk      # 0 parity holds, 1 disagrees, 2 could not measure
 ```
 
 The gate compiles the module to **both** `js-browser` and `wasm32-browser`,
