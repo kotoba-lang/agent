@@ -1,8 +1,8 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; verify-turn-loop-parity — agent.turn-loop must agree with the loop it was
 ;; transcribed from.
 ;;
-;;   nbb scripts/verify-turn-loop-parity.cljk
+;;   kbb --backend sci scripts/verify-turn-loop-parity.cljk
 ;;
 ;; exit 0 = parity holds, 1 = a case disagrees, 2 = could not measure.
 ;;
