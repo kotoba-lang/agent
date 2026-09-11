@@ -25,7 +25,7 @@ execution and message building stay outside: those are sockets, SDKs and
 credentials, which is mechanism, not product semantics.
 
 ```
-nbb scripts/verify-turn-loop-parity.cljk      # 0 parity holds, 1 disagrees, 2 could not measure
+kbb --backend sci scripts/verify-turn-loop-parity.cljk      # 0 parity holds, 1 disagrees, 2 could not measure
 ```
 
 The gate compiles the module to **both** `js-browser` and `wasm32-browser`,
@@ -95,7 +95,7 @@ entries.
 
 ```sh
 npm test          # nbb / JS host
-clojure -M:test   # JVM host — must agree exactly
+kbb -M:test   # JVM host — must agree exactly
 ```
 
 7 tests, 25 assertions, both hosts.
