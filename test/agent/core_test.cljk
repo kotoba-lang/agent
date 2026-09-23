@@ -1,5 +1,5 @@
 (ns agent.core-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [agent.run :as run]))
 
 (def t0 1785000000000)
