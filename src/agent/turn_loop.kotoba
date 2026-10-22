@@ -1,6 +1,6 @@
 (ns agent.turn-loop
   (:export [new-loop step running? exit-code api-call-count budget-used
-            run-exit-code run-api-calls run-budget-used main])
+            run-exit-code run-api-calls run-budget-used run-budget-remaining main])
   (:schemas
    {:agent/loop
     [:record :agent/loop
@@ -171,6 +171,10 @@
 (defn run-budget-used [mx :i64 bmax :i64 evs :string] :i64
   (budget-used (run mx bmax evs)))
 
+(defn run-budget-remaining [mx :i64 bmax :i64 evs :string] :i64
+  (let [remaining (- bmax (run-budget-used mx bmax evs))]
+    (if (> remaining 0) remaining 0)))
+
 (defn main [] :i64
   ;; plain-3: three ticks under a roomy budget stay running at n=3
   (if (= 0 (run-exit-code 5 5 "000"))
@@ -183,7 +187,23 @@
             (if (= 1 (run-api-calls 5 5 "010"))
               ;; grace-past-max: tick, grace, tick, tick -> n=2, used=1
               (if (= 2 (run-api-calls 1 9 "0400"))
-                (if (= 1 (run-budget-used 1 9 "0400")) 42 7)
+                (if (= 1 (run-budget-used 1 9 "0400"))
+                  ;; remaining follows consumption, refunds, grace and exits;
+                  ;; an exhausted or negative budget is clamped to zero.
+                  (if (= 2 (run-budget-remaining 5 5 "000"))
+                    (if (= 5 (run-budget-remaining 5 5 ""))
+                      (if (= 0 (run-budget-remaining 9 2 "000"))
+                        (if (= 0 (run-budget-remaining 5 -1 ""))
+                          (if (= 1 (run-budget-remaining 9 2 "003"))
+                            (if (= 8 (run-budget-remaining 1 9 "0400"))
+                              (if (= 4 (run-budget-remaining 5 5 "0130")) 42 14)
+                              13)
+                            12)
+                          11)
+                        10)
+                      9)
+                    8)
+                  7)
                 6)
               5)
             4)
