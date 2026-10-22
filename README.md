@@ -94,11 +94,20 @@ entries.
 ## Test
 
 ```sh
-npm test          # nbb / JS host
-kbb -M:test   # JVM host — must agree exactly
+npm test          # nbb / JS host; 10 tests, 34 assertions in this checkout
 ```
 
-7 tests, 25 assertions, both hosts.
+`kbb -M:test` uses the engine configured for this workspace; here it selected
+the nbb test substitution and also ran 10 tests, 34 assertions. A direct
+`clj -M:test` currently discovers zero tests because the source test namespace
+is `.cljk`; its zero-test exit is not a JVM verification result.
+
+## Agent and LLM coding evaluation
+
+The repository includes a project-scoped Kotoba coding skill for Codex and
+trusted Hermes project sessions, plus a versioned two-stage agent coding pilot
+that scores exact Kotoba behavior, elapsed time, provider-reported tokens, and
+session continuity. See [`eval/v1/README.md`](eval/v1/README.md).
 
 ## Kotoba source authority
 

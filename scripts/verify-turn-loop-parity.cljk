@@ -29,7 +29,7 @@
 ;;
 ;; ## Three things that will bite whoever edits this
 ;;
-;;   fuel        is spent for the life of an INSTANCE. Three queries per case
+;;   fuel        is spent for the life of an INSTANCE. Four queries per case
 ;;               across ten cases exhausted one instance at case eight
 ;;               (`fuel-exhausted`), so each query instantiates its own.
 ;;   i64         arguments must be BigInt. A JS number raises `invalid-i64`.
@@ -133,20 +133,26 @@
                 (fn [m]
                   (let [inst (.-instantiateKotoba m)
                         fails (atom [])]
-                    (doseq [c cases]
-                      (let [evs (apply str (map ev-digit (:events c)))
-                            mx (js/BigInt (:max-iterations c))
-                            bm (js/BigInt (:budget-max c))
-                            got [(js/Number ((aget (inst) "run-exit-code") mx bm evs))
-                                 (js/Number ((aget (inst) "run-api-calls") mx bm evs))
-                                 (js/Number ((aget (inst) "run-budget-used") mx bm evs))]
-                            exp [(reason-code (:exit-reason c))
-                                 (:api-call-count c) (:budget-used c)]]
-                        (if (= exp got)
-                          (println (str "  ok    " (name (:name c)) "  evs=" evs))
-                          (do (swap! fails conj (:name c))
-                              (println (str "  FAIL  " (name (:name c))
-                                            "  expected=" exp " got=" got))))))
+                    (if (some? (aget (inst) "run-budget-remaining"))
+                      (doseq [c cases]
+                        (let [evs (apply str (map ev-digit (:events c)))
+                              mx (js/BigInt (:max-iterations c))
+                              bm (js/BigInt (:budget-max c))
+                              got [(js/Number ((aget (inst) "run-exit-code") mx bm evs))
+                                   (js/Number ((aget (inst) "run-api-calls") mx bm evs))
+                                   (js/Number ((aget (inst) "run-budget-used") mx bm evs))
+                                   (js/Number ((aget (inst) "run-budget-remaining") mx bm evs))]
+                              remaining (- (:budget-max c) (:budget-used c))
+                              exp [(reason-code (:exit-reason c))
+                                   (:api-call-count c) (:budget-used c)
+                                   (if (< remaining 0) 0 remaining)]]
+                          (if (= exp got)
+                            (println (str "  ok    " (name (:name c)) "  evs=" evs))
+                            (do (swap! fails conj (:name c))
+                                (println (str "  FAIL  " (name (:name c))
+                                              "  expected=" exp " got=" got))))))
+                      (do (swap! fails conj :missing-run-budget-remaining)
+                          (println "  FAIL  missing export run-budget-remaining")))
                     (js/Promise.resolve
                       {:fails @fails
                        :js-main (str ((aget (inst) "main")))}))))
